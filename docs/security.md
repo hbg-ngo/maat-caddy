@@ -35,3 +35,18 @@
   - Never proxy the health endpoint through Caddy.
 - Everything is bounded: queue size, number of workers, request timeouts, response reads, line length, retries and retention.
 - `npm` install scripts are disabled (`.npmrc`). Dependencies are pinned exactly and locked, and CI runs `npm audit` on production dependencies.
+
+## Supply chain
+
+- Renovate (`.github/renovate.json5`) keeps npm packages, GitHub Actions (pinned by commit SHA) and base images (pinned by digest) up to date.
+  - Releases are only picked up once they are 3 days old. Security fixes are raised immediately.
+  - Non-major updates auto-merge once CI passes. Majors need a manual review. Publishing a release is always a manual tag.
+- CI rejects pull requests that add dependencies with known vulnerabilities (dependency review). It also scans the built image with Grype and fails on fixable high or critical findings.
+- The published `:latest` image is rescanned daily (`.github/workflows/image-scan.yml`). Findings appear in the repository's Security tab.
+- Release images carry SLSA provenance and an SBOM, plus a signed GitHub attestation:
+
+  ```sh
+  gh attestation verify oci://ghcr.io/hbg-ngo/maat-caddy:vX.Y.Z --owner hbg-ngo
+  ```
+
+- Vulnerabilities can be reported privately, see [SECURITY.md](../SECURITY.md).

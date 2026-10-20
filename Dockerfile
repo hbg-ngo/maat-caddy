@@ -1,9 +1,10 @@
 # syntax=docker/dockerfile:1
-# Node.js 24.22.0 LTS, pinned by multi-arch index digest. Build on Debian trixie
-# slim, run on distroless (no shell, no package manager) with the same Node version.
-# Keep in sync with .nvmrc and package.json "engines".
+# Node.js 24 LTS, pinned by multi-arch index digest. Build on Debian trixie slim,
+# run on distroless (no shell, no package manager) with the same Node version.
+# Must match .nvmrc and package.json "engines": Renovate updates them together
+# and CI fails if the runtime image ships a different Node version.
 ARG NODE_IMAGE=node:24.22.0-trixie-slim@sha256:7f486cabe892bff8fef04c0f7da8dba84a560be3e4e2740b7a86afc57ebec315
-ARG RUNTIME_IMAGE=gcr.io/distroless/nodejs24-debian13@sha256:9ddd3f7de61d8c62337cdcbeaceb621de5e0c955ccdc70f4c3586db74a8c278f
+ARG RUNTIME_IMAGE=gcr.io/distroless/nodejs24-debian13:latest@sha256:9ddd3f7de61d8c62337cdcbeaceb621de5e0c955ccdc70f4c3586db74a8c278f
 
 FROM ${NODE_IMAGE} AS build
 WORKDIR /app
