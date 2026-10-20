@@ -1,0 +1,53 @@
+services:
+  maat-caddy:
+    # Released images: ghcr.io/hbg-ngo/maat-caddy:<version>. Set APP_VERSION
+    # (e.g. in .env) to pin one. For local builds see compose.build.yaml.
+    image: ghcr.io/hbg-ngo/maat-caddy:${APP_VERSION:-latest}
+    container_name: maat-caddy
+    init: true
+    restart: unless-stopped
+    # Must be able to read the Caddy log directory and the secret, and write ./data.
+    user: "10001:10001"
+    # GID of the host's "caddy" group (`getent group caddy`), so the container
+    # can read the log files. Caddy must write them with `mode 0640`; see
+    # docs/deployment.md.
+    group_add:
+      - "${CADDY_GID:?set CADDY_GID to the GID of the host's caddy group}"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 100
+    mem_limit: 256m
+    cpus: 0.50
+    stop_grace_period: 30s
+    volumes:
+      # Mount the directory (not the single file) so rename/create rotation is
+      # visible inside the container and rotated files can be drained.
+      - /var/log/caddy:/var/log/caddy:ro
+      - ./config/config.toml:/etc/maat-caddy/config.toml:ro
+      - ./data:/var/lib/maat-caddy
+    secrets:
+      - matomo_token
+    environment:
+      CONFIG_PATH: /etc/maat-caddy/config.toml
+      MATOMO_TOKEN_FILE: /run/secrets/matomo_token
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    # No ports published. The health endpoint binds to 127.0.0.1 inside the container.
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:9788/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+secrets:
+  matomo_token:
+    file: ./secrets/matomo-token

@@ -1,0 +1,11 @@
+# Local build instead of the released image:
+#   docker compose -f compose.yaml -f compose.build.yaml up -d --build
+services:
+  maat-caddy:
+    image: maat-caddy:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # If containers on your default Docker bridge can't resolve DNS during
+      # the build, uncomment:
+      # network: host

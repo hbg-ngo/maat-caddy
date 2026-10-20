@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+data/
+secrets/
+config/config.toml
+*.log
+npm-debug.log*
+.env
+.env.*
+.DS_Store

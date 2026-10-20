@@ -1,0 +1,86 @@
+# Example configuration. Copy to config/config.toml and adjust.
+# Unknown keys or invalid values make the tracker refuse to start.
+
+[matomo]
+# Must be HTTPS. Requires Matomo >= 5.7.0 (bot tracking via recMode=1).
+endpoint = "https://matomo.example.com/matomo.php"
+site_id = 1
+# Secret file containing only the token_auth of a Matomo user with *write*
+# access to this site. Overridden by $MATOMO_TOKEN_FILE. Never put the token here.
+token_file = "/run/secrets/matomo_token"
+request_timeout_seconds = 10
+strip_query_string = true
+# Sent as Matomo `source` for every event.
+source = "Caddy"
+# Send queuedtracking=0 so Matomo processes each event immediately instead of
+# via the QueuedTracking plugin. Its deferred processing can lose token_auth
+# and then silently drops events older than 24h (seen with Matomo 5.14).
+bypass_queued_tracking = true
+
+[log]
+path = "/var/log/caddy/example.com.log"
+format = "json"
+expected_host = "example.com"
+# Where to start when no checkpoint exists yet: "end" (only new requests) or "beginning".
+start_position = "end"
+poll_interval_ms = 500
+# Lines longer than this are skipped (counted as oversized).
+max_line_bytes = 1048576
+# Max lines per SQLite transaction.
+batch_lines = 1000
+# After rotation, keep reading the old file until it has been idle this long.
+rotation_grace_ms = 1000
+
+[storage]
+database_path = "/var/lib/maat-caddy/queue.sqlite3"
+max_queue_events = 100000
+delivered_retention_days = 7
+dead_letter_retention_days = 30
+
+[server]
+# Must be a loopback address. Never expose or proxy this endpoint.
+health_listen = "127.0.0.1:9788"
+
+[delivery]
+workers = 4
+max_attempts = 12
+initial_backoff_seconds = 2
+max_backoff_seconds = 900
+lease_seconds = 60
+idle_poll_ms = 1000
+shutdown_timeout_seconds = 20
+# Failures after which Matomo may already have recorded the event (timeout,
+# connection reset, 5xx except 503, crash mid-request). Matomo cannot
+# deduplicate, so: "retry" = at-least-once (possible duplicates),
+# "dead_letter" = at-most-once (possible losses; replay manually if wanted).
+on_ambiguous_failure = "retry"
+
+[filtering]
+allowed_status_min = 200
+# Only content deliveries count by default; redirects (3xx) would count a
+# fetch twice (redirect + target).
+allowed_status_max = 299
+allowed_methods = ["GET"]
+exclude_paths = ["/robots.txt", "/health", "/healthz"]
+exclude_prefixes = ["/_next/", "/api/"]
+exclude_extensions = [".css", ".js", ".mjs", ".map", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".avif", ".ico", ".woff", ".woff2", ".ttf", ".otf", ".mp4", ".webm", ".mp3"]
+# Fetches of these are sent as Matomo downloads (`download` = `url`).
+document_extensions = [".pdf"]
+
+[ai_assistants]
+# Mirrors Matomo's BotDetector list (plugins/BotTracking/BotDetector.php,
+# commit 71b5fbf). Matched like Matomo: case-insensitive substring of the UA.
+# Only list agents Matomo recognises; it silently discards all other bot requests.
+user_agents = ["ChatGPT-User", "MistralAI-User", "Gemini-Deep-Research", "Claude-User", "Perplexity-User", "Google-GeminiNotebook", "Google-NotebookLM"]
+
+[training_crawlers]
+# Always excluded, checked before [ai_assistants]. Matched as whole product names.
+user_agents = ["GPTBot", "ClaudeBot", "Google-Extended", "CCBot", "Amazonbot"]
+
+[debug]
+# Optional debug-level log lines from the daemon (not the import command).
+# Each is rate-limited to 20 lines per minute; suppressed lines are counted.
+# Log each event Matomo accepted: assistant, url, status, request time, attempts.
+log_tracked = false
+# Log each skipped training-crawler request: crawler, path (no query), status, request time.
+log_excluded_crawlers = false

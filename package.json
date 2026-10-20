@@ -1,0 +1,38 @@
+{
+  "name": "maat-caddy",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MAAT: Matomo AI Assistant Tracker for Caddy access logs",
+  "license": "MIT",
+  "author": "Handbook Germany gGmbH",
+  "homepage": "https://github.com/hbg-ngo/maat-caddy#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hbg-ngo/maat-caddy.git"
+  },
+  "bugs": "https://github.com/hbg-ngo/maat-caddy/issues",
+  "type": "module",
+  "engines": {
+    "node": "24.22.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "node --test --import ./test-support/network-guard.ts \"tests/**/*.test.ts\"",
+    "test:integration": "node --test --test-concurrency=1 --import ./test-support/network-guard.ts \"test-integration/**/*.test.ts\"",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "13.0.3",
+    "smol-toml": "1.9.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/better-sqlite3": "9.6.0",
+    "@types/node": "24.19.2",
+    "eslint": "10.13.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.2"
+  }
+}
