@@ -32,7 +32,7 @@ What to alert on:
 Two optional flags in `[debug]` (both off by default) add `debug`-level log lines from the daemon. The `import` command never emits them.
 
 - `log_tracked = true`: `"event tracked"` for each event Matomo accepted, with `assistant`, `url`, `httpStatus`, `eventTs` and `attempts`.
-- `log_excluded_crawlers = true`: `"training crawler excluded"` for each skipped training-crawler request, with `crawler`, `path` (never the query string), `status` and `ts`.
+- `log_excluded_crawlers = true`: `"training crawler excluded"` for each skipped training-crawler request, with `crawler`, `url` (never the query string), `httpStatus` and `eventTs`.
 
 Each kind is limited to 20 lines per minute. Suppressed lines are reported as `"<msg> (suppressed)"` with a count. Turning on either flag sets the log level to `debug`. Check them with `docker compose logs -f maat-caddy`.
 

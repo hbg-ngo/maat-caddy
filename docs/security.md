@@ -10,7 +10,7 @@
 - Fingerprints (`seen_events`) are one-way SHA-256 hashes of data that is already stored in the queue (see [import.md](import.md)). They hold no IPs or other request data and are kept indefinitely.
   - Malformed-line diagnostics contain only the reason and the line length.
   - Dead-letter views contain only reason codes and counts.
-  - Optional `[debug]` lines (off by default) contain only the matched agent name, the URL or path, status, request time and attempts. Excluded-crawler lines never include the query string.
+  - Optional `[debug]` lines (off by default) contain only the matched agent name, the URL, status, request time and attempts. Excluded-crawler lines never include the query string.
 - Matomo response bodies are never logged. At most 16 KiB of a response is read before it is discarded.
 
 ## Secrets
