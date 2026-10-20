@@ -1,0 +1,51 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: ["config:best-practices"],
+  timezone: "Europe/Berlin",
+  schedule: ["before 6am on monday"],
+  // Supply-chain buffer: ignore releases until they are a few days old.
+  minimumReleaseAge: "3 days",
+  rangeStrategy: "pin",
+  labels: ["dependencies"],
+  // Security fixes are raised immediately, outside the schedule.
+  osvVulnerabilityAlerts: true,
+  vulnerabilityAlerts: {
+    schedule: ["at any time"],
+    minimumReleaseAge: null,
+  },
+  lockFileMaintenance: {
+    enabled: true,
+    automerge: true,
+    schedule: ["before 6am on the first day of the month"],
+  },
+  packageRules: [
+    {
+      description: "Auto-merge non-major updates once CI passes. Releases stay manual (tags).",
+      matchUpdateTypes: ["minor", "patch", "pin", "digest", "pinDigest"],
+      automerge: true,
+    },
+    {
+      description: "One PR for dev tooling",
+      matchDepTypes: ["devDependencies"],
+      matchUpdateTypes: ["minor", "patch"],
+      groupName: "dev dependencies",
+    },
+    {
+      description: "One PR for GitHub Actions",
+      matchManagers: ["github-actions"],
+      groupName: "GitHub Actions",
+    },
+    {
+      description: "Node.js must match across .nvmrc, package.json engines and both Dockerfile stages (CI checks it)",
+      matchDepNames: ["node", "/^gcr\\.io/distroless/nodejs/"],
+      matchUpdateTypes: ["minor", "patch", "digest"],
+      groupName: "Node.js",
+    },
+    {
+      description: "Node.js majors need a manual switch (distroless image name, @types/node); approve from the dashboard",
+      matchDepNames: ["node", "@types/node"],
+      matchUpdateTypes: ["major"],
+      dependencyDashboardApproval: true,
+    },
+  ],
+}
