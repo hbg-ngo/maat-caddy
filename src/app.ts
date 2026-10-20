@@ -47,12 +47,12 @@ export function createLineProcessor(
     if (!decision.qualifies) {
       metrics.inc(`skipped_${decision.reason}`);
       if (crawlerLog !== null && decision.reason === "excluded_crawler") {
-        // Path only (never the query string), no IP or raw line.
+        // URL without query string, no IP or raw line.
         crawlerLog.log("debug", "training crawler excluded", {
           crawler: decision.crawler,
-          path: normalizeUrl(config.log.expectedHost, parsed.record.uri, true)?.pathname ?? null,
-          status: parsed.record.status,
-          ts: parsed.record.ts,
+          url: normalizeUrl(config.log.expectedHost, parsed.record.uri, true)?.url ?? null,
+          httpStatus: parsed.record.status,
+          eventTs: parsed.record.ts,
         });
       }
       return null;
@@ -139,7 +139,7 @@ export class App {
     this.workers.start();
     this.follower.start();
     log("info", "tracker started", {
-      logPath: this.config.log.path,
+      path: this.config.log.path,
       endpoint: this.config.matomo.endpoint.origin,
       health: `${addr.address}:${addr.port}`,
       workers: this.config.delivery.workers,

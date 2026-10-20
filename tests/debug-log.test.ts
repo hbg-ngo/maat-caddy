@@ -41,9 +41,9 @@ describe("debug logging", () => {
       level: "debug",
       msg: "training crawler excluded",
       crawler: "GPTBot",
-      path: "/de/arbeit",
-      status: 200,
-      ts: 1_760_000_000.5,
+      url: "https://example.com/de/arbeit",
+      httpStatus: 200,
+      eventTs: 1_760_000_000.5,
     });
     assert.doesNotMatch(JSON.stringify(lines), /secret|remote_ip|127\.0\.0\.1/);
   });
