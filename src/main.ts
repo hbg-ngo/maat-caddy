@@ -1,5 +1,5 @@
 import { parseArgs } from "node:util";
-import { App, createLineProcessor } from "./app.ts";
+import { App, createLineProcessor, storeOptions } from "./app.ts";
 import { Importer, parseDateArg } from "./importer.ts";
 import { ConfigError, loadConfig, loadToken, type Config } from "./config.ts";
 import { describeError, log, setLogSink } from "./log.ts";
@@ -69,7 +69,7 @@ async function run(config: Config): Promise<number> {
 }
 
 function withStore<T>(config: Config, fn: (store: Store) => T): T {
-  const store = new Store(config.storage.databasePath, { maxQueueEvents: config.storage.maxQueueEvents });
+  const store = new Store(config.storage.databasePath, storeOptions(config));
   try {
     return fn(store);
   } finally {
@@ -88,7 +88,7 @@ async function runImport(
   if (since !== null && until !== null && since >= until) throw new ConfigError("--since must be before --until");
   // Keep stdout for the JSON report; diagnostics go to stderr.
   setLogSink((line) => process.stderr.write(line + "\n"));
-  const store = new Store(config.storage.databasePath, { maxQueueEvents: config.storage.maxQueueEvents });
+  const store = new Store(config.storage.databasePath, storeOptions(config));
   try {
     const importer = new Importer({
       store,

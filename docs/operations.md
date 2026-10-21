@@ -8,7 +8,7 @@ All commands below run inside the container: `docker compose exec maat-caddy <cm
 - `GET http://127.0.0.1:9788/metrics` returns aggregates only:
   - `queue`: pending, inflight, delivered and dead counts, and the oldest pending event.
   - Line counters: `lines_read`, `lines_malformed`, `lines_oversized`, `skipped_<reason>`.
-  - Enqueue and delivery counters: `events_enqueued`, `events_duplicate_skipped`, `deliveries_ok`, `deliveries_retried`, `deliveries_dead`, `deliveries_ambiguous`, `lease_lost`.
+  - Enqueue and delivery counters: `events_enqueued`, `events_duplicate_skipped`, `events_too_old_skipped`, `deliveries_ok`, `deliveries_retried`, `deliveries_dead`, `deliveries_ambiguous`, `lease_lost`.
   - Follower counters: `rotations`, `truncations`, `rotation_gaps`, `queue_full_pauses`, `commit_failures`.
   - Gauges: `follower_lag_bytes`, `follower_offset`, `last_delivery_at`.
 
@@ -26,6 +26,7 @@ What to alert on:
 | `rotation_gaps` > 0 | A rotated log was compressed or deleted while the tracker was down. Consider `roll_uncompressed` in Caddy |
 | `commit_failures` or `queue_full_pauses` | Disk problems, or a long Matomo outage |
 | `follower_lag_bytes` staying high | The follower is falling behind the log |
+| `events_too_old_skipped` > 0 | Downtime longer than `seen_retention_days`; those requests were not sent |
 
 ## Debug logging
 

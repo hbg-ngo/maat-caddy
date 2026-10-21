@@ -7,11 +7,18 @@ import { HealthServer, type HealthReport } from "./health.ts";
 import { describeError, log, RateLimitedLogger, registerSecret, setLogLevel } from "./log.ts";
 import { MatomoClient } from "./matomo.ts";
 import { Metrics } from "./metrics.ts";
-import { Store, type QueuedEvent } from "./store.ts";
+import { Store, type QueuedEvent, type StoreOptions } from "./store.ts";
 import { WorkerPool, type Sender } from "./worker.ts";
 
 const DAY_MS = 86_400_000;
 const RETENTION_INTERVAL_MS = 3_600_000;
+
+export function storeOptions(config: Config): StoreOptions {
+  return {
+    maxQueueEvents: config.storage.maxQueueEvents,
+    seenRetentionMs: config.storage.seenRetentionDays * DAY_MS,
+  };
+}
 
 export interface AppOptions {
   /** Override the Matomo sender (tests). */
@@ -92,7 +99,7 @@ export class App {
     this.config = config;
     registerSecret(token);
     if (config.debug.logTracked || config.debug.logExcludedCrawlers) setLogLevel("debug");
-    this.store = new Store(config.storage.databasePath, { maxQueueEvents: config.storage.maxQueueEvents });
+    this.store = new Store(config.storage.databasePath, storeOptions(config));
     const sender =
       opts.sender ??
       new MatomoClient({
@@ -167,7 +174,7 @@ export class App {
         this.config.storage.deliveredRetentionDays * DAY_MS,
         this.config.storage.deadLetterRetentionDays * DAY_MS,
       );
-      if (removed.delivered + removed.dead > 0) log("info", "retention cleanup", removed);
+      if (removed.delivered + removed.dead + removed.seen > 0) log("info", "retention cleanup", removed);
     } catch (err) {
       log("error", "retention cleanup failed", { error: describeError(err) });
     }

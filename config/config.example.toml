@@ -36,6 +36,11 @@ database_path = "/var/lib/maat-caddy/queue.sqlite3"
 max_queue_events = 100000
 delivered_retention_days = 7
 dead_letter_retention_days = 30
+# Deduplication fingerprints (~50 bytes per queued request). 0 = keep forever.
+# Otherwise fingerprints older than this are deleted, and log lines older than
+# this are skipped (live and import), because they could be queued twice.
+# Must be longer than any downtime and the age of logs you might import.
+seen_retention_days = 0
 
 [server]
 # Must be a loopback address. Never expose or proxy this endpoint.

@@ -27,6 +27,8 @@ export interface Config {
     maxQueueEvents: number;
     deliveredRetentionDays: number;
     deadLetterRetentionDays: number;
+    /** 0 = keep deduplication fingerprints forever. */
+    seenRetentionDays: number;
   };
   server: {
     healthHost: string;
@@ -269,6 +271,7 @@ export function parseConfig(text: string): Config {
     maxQueueEvents: s.int("max_queue_events", 1, 10_000_000, 100_000),
     deliveredRetentionDays: s.num("delivered_retention_days", 0, 3650, 7),
     deadLetterRetentionDays: s.num("dead_letter_retention_days", 0, 3650, 30),
+    seenRetentionDays: s.int("seen_retention_days", 0, 36_500, 0),
   };
   s.done();
 

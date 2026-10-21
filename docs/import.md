@@ -13,7 +13,7 @@ docker compose exec maat-caddy node dist/main.js import [--dry-run] [--since <da
 - `--since` / `--until` take `YYYY-MM-DD` (UTC midnight) or an ISO timestamp. `--since` is inclusive, `--until` exclusive.
 - `--dry-run` writes nothing. It reports what would be queued.
 - The token isn't needed, because the daemon does the delivery. If the queue is full (`max_queue_events`), the import waits until the daemon has made room. If the daemon isn't running, start it first.
-- The result is printed as JSON on stdout: per file and in total, `lines`, `malformed`, `oversized`, `qualifying`, `outOfRange`, `enqueued`, `alreadySeen`. Log messages go to stderr.
+- The result is printed as JSON on stdout: per file and in total, `lines`, `malformed`, `oversized`, `qualifying`, `outOfRange`, `enqueued`, `alreadySeen`, `tooOld`. Log messages go to stderr.
 
 ## Safe to run more than once
 
@@ -30,8 +30,9 @@ same transaction as the insert. This covers:
 The fingerprint is built from data the tracker stores anyway: the timestamp and
 duration exactly as logged, the method, the normalised URL, the User-Agent, the
 status and the size. No IP and no query string (unless `strip_query_string =
-false`). Fingerprints are kept forever; retention only removes the events
-themselves. That's about 40–50 bytes per assistant request.
+false`). By default fingerprints are kept forever; retention only removes the
+events themselves. That's about 40–50 bytes per assistant request. See
+[Disk usage](#disk-usage) to limit this.
 
 Two caveats:
 - If you change `strip_query_string` or `expected_host`, the URLs change, and with them the fingerprints. Requests imported before the change would then be queued again.
@@ -58,7 +59,23 @@ Two caveats:
 
 ## Disk usage
 
-`seen_events` grows by one row per queued assistant request and never shrinks.
-At 10,000 assistant requests per day that's roughly 200 MB per year. To reset
-it, stop the daemon, then delete the database. Doing so drops the queue and the
-protection against re-imports.
+`seen_events` grows by one row per queued assistant request. At 10,000
+assistant requests per day that's roughly 200 MB per year. Lookups stay fast
+(primary-key index), so this is only a disk-space question.
+
+To bound it, set `seen_retention_days` in `[storage]` (default `0` = keep
+forever). The hourly retention run then deletes fingerprints of requests older
+than that, plus an index on the request time (only created when the option is
+set). To keep "never queued twice" true, requests older than the horizon are no
+longer queued at all:
+
+- `import` counts them as `tooOld`;
+- the live follower counts them as `events_too_old_skipped` (e.g. after downtime longer than the horizon).
+
+So choose a horizon longer than any expected downtime and older than the logs
+you might import, e.g. Matomo's raw-data retention period. SQLite reuses freed
+pages, so the file stops growing but doesn't shrink; run `VACUUM` with the
+daemon stopped to reclaim space.
+
+To reset everything, stop the daemon, then delete the database. Doing so drops
+the queue and the protection against re-imports.

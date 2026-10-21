@@ -348,6 +348,7 @@ export class Follower {
     file.fpLen = fpLen;
     file.fpHash = fpHash;
     if (result.duplicates > 0) this.opts.metrics.inc("events_duplicate_skipped", result.duplicates);
+    if (result.tooOld > 0) this.opts.metrics.inc("events_too_old_skipped", result.tooOld);
     if (result.enqueued > 0) {
       this.opts.metrics.inc("events_enqueued", result.enqueued);
       this.opts.onEnqueued?.();
