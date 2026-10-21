@@ -1,6 +1,6 @@
 {
   "name": "maat-caddy",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "MAAT: Matomo AI Assistant Tracker for Caddy access logs",
   "license": "MIT",
