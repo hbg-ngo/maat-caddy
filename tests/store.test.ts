@@ -41,20 +41,49 @@ describe("store", () => {
     const s = open();
     const a = sampleEvent();
     const b = sampleEvent();
-    assert.deepEqual(s.commitBatch([a, b, a], cp(1)), { enqueued: 2, duplicates: 1 });
-    assert.deepEqual(s.commitBatch([b], null), { enqueued: 0, duplicates: 1 });
+    assert.deepEqual(s.commitBatch([a, b, a], cp(1)), { enqueued: 2, duplicates: 1, tooOld: 0 });
+    assert.deepEqual(s.commitBatch([b], null), { enqueued: 0, duplicates: 1, tooOld: 0 });
     assert.equal(s.getCheckpoint()?.offset, 1, "null checkpoint leaves it untouched");
     for (let ev = s.claim(1000); ev; ev = s.claim(1000)) s.ack(ev.id, ev.leaseToken);
     clock += 10_000;
-    assert.equal(s.cleanup(0, 0).delivered, 2);
+    assert.deepEqual(s.cleanup(0, 0), { delivered: 2, dead: 0, seen: 0 });
     assert.equal(s.seenCount(), 2);
     assert.ok(s.isSeen(a.fingerprint));
     assert.equal(s.isSeen(sampleEvent().fingerprint), false);
-    assert.deepEqual(s.commitBatch([a, b], null), { enqueued: 0, duplicates: 2 });
+    assert.deepEqual(s.commitBatch([a, b], null), { enqueued: 0, duplicates: 2, tooOld: 0 });
     s.close();
     const reopened = open();
-    assert.deepEqual(reopened.commitBatch([a], null), { enqueued: 0, duplicates: 1 }, "persisted");
+    assert.deepEqual(reopened.commitBatch([a], null), { enqueued: 0, duplicates: 1, tooOld: 0 }, "persisted");
     reopened.close();
+  });
+
+  it("with seen retention, prunes old fingerprints and refuses events beyond the horizon", () => {
+    const day = 86_400_000;
+    clock = 100 * day;
+    const s = new Store(dbPath, { maxQueueEvents: 100, seenRetentionMs: 10 * day, now });
+    const ts = (daysAgo: number) => (clock - daysAgo * day) / 1000;
+    const old = sampleEvent({ eventTs: ts(9) });
+    const recent = sampleEvent({ eventTs: ts(1) });
+    assert.deepEqual(s.commitBatch([old, recent, sampleEvent({ eventTs: ts(11) })], cp(1)), { enqueued: 2, duplicates: 0, tooOld: 1 });
+    assert.equal(s.isTooOld(ts(11)), true);
+    assert.equal(s.isTooOld(ts(9)), false);
+
+    clock += 2 * day; // `old` is now 11 days old
+    assert.equal(s.cleanup(day, day).seen, 1);
+    assert.equal(s.isSeen(old.fingerprint), false);
+    assert.ok(s.isSeen(recent.fingerprint));
+    assert.deepEqual(s.commitBatch([old, recent], null), { enqueued: 0, duplicates: 1, tooOld: 1 }, "never re-queued");
+    s.close();
+  });
+
+  it("prunes many fingerprints in batches", () => {
+    const s = new Store(dbPath, { maxQueueEvents: 30_000, seenRetentionMs: 1000, now });
+    const evs = Array.from({ length: 25_000 }, () => sampleEvent({ eventTs: clock / 1000 }));
+    s.commitBatch(evs, null);
+    clock += 2000;
+    assert.equal(s.cleanup(1e12, 1e12).seen, 25_000);
+    assert.equal(s.seenCount(), 0);
+    s.close();
   });
 
   it("rolls back fingerprints together with a failed batch", () => {
@@ -188,9 +217,10 @@ describe("store", () => {
     const b = s.claim(1000)!;
     s.deadLetter(b.id, b.leaseToken, "http_400");
     clock += 10_000;
-    assert.deepEqual(s.cleanup(20_000, 20_000), { delivered: 0, dead: 0 });
-    assert.deepEqual(s.cleanup(5_000, 20_000), { delivered: 1, dead: 0 });
-    assert.deepEqual(s.cleanup(5_000, 5_000), { delivered: 0, dead: 1 });
+    assert.deepEqual(s.cleanup(20_000, 20_000), { delivered: 0, dead: 0, seen: 0 });
+    assert.deepEqual(s.cleanup(5_000, 20_000), { delivered: 1, dead: 0, seen: 0 });
+    assert.deepEqual(s.cleanup(5_000, 5_000), { delivered: 0, dead: 1, seen: 0 });
+    assert.equal(s.seenCount(), 3, "fingerprints are kept forever by default");
     assert.equal(s.stats().pending, 1, "pending events are never removed by retention");
     s.close();
   });

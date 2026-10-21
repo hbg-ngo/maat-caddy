@@ -20,11 +20,11 @@ afterEach(() => {
   for (const s of stores.splice(0)) s.close();
 });
 
-function setup(maxQueue = 1000) {
+function setup(maxQueue = 1000, seenRetentionMs = 0) {
   const dir = join(tmp.dir, `i${n++}`);
   mkdirSync(join(dir, "logs"), { recursive: true });
   const cfg = testConfig({ dir });
-  const store = new Store(cfg.storage.databasePath, { maxQueueEvents: maxQueue });
+  const store = new Store(cfg.storage.databasePath, { maxQueueEvents: maxQueue, seenRetentionMs });
   stores.push(store);
   const importer = (o: Partial<ImportOptions> = {}) =>
     new Importer({
@@ -56,7 +56,7 @@ describe("importer", () => {
     writeFileSync(plain, line("/p1") + "\r\n" + line("/_next/x.js") + caddyLine({ uri: "/p2" })); // no trailing newline
     const r = await t.importer().importFiles([gz, plain]);
     assert.deepEqual(t.urls(), ["/g1", "/g2", "/p1", "/p2"]);
-    assert.deepEqual(r.total, { lines: 7, malformed: 1, oversized: 0, qualifying: 4, outOfRange: 0, enqueued: 4, alreadySeen: 0 });
+    assert.deepEqual(r.total, { lines: 7, malformed: 1, oversized: 0, qualifying: 4, outOfRange: 0, enqueued: 4, alreadySeen: 0, tooOld: 0 });
     assert.equal(r.files[0]!.enqueued, 2);
   });
 
@@ -142,6 +142,19 @@ describe("importer", () => {
     assert.deepEqual(t.urls(), ["/feb"]);
     assert.equal(r.total.outOfRange, 2);
     assert.throws(() => parseDateArg("yesterday", "--since"), /invalid date/);
+  });
+
+  it("skips events beyond seen retention, in dry run and for real", async () => {
+    const day = 86_400_000;
+    const t = setup(1000, 30 * day);
+    const ts = (daysAgo: number) => (Date.now() - daysAgo * day) / 1000;
+    const f = join(t.logs, "a.log");
+    writeFileSync(f, line("/old", ts(31)) + line("/new", ts(29)));
+    const dry = await t.importer({ dryRun: true }).importFiles([f]);
+    assert.deepEqual([dry.total.enqueued, dry.total.tooOld], [1, 1]);
+    const r = await t.importer().importFiles([f]);
+    assert.deepEqual([r.total.enqueued, r.total.tooOld], [1, 1]);
+    assert.deepEqual(t.urls(), ["/new"]);
   });
 
   it("skips oversized lines with bounded memory", async () => {

@@ -31,6 +31,8 @@ export interface FileReport {
   outOfRange: number;
   enqueued: number;
   alreadySeen: number;
+  /** Older than `seen_retention_days`, so they can't be deduplicated any more. */
+  tooOld: number;
 }
 
 const GZIP_MAGIC = [0x1f, 0x8b];
@@ -103,6 +105,7 @@ export class Importer {
       outOfRange: 0,
       enqueued: 0,
       alreadySeen: 0,
+      tooOld: 0,
     };
     const metrics = new Metrics();
     const processLine = this.opts.lineProcessor(metrics);
@@ -117,7 +120,8 @@ export class Importer {
       batch = [];
       if (this.opts.dryRun) {
         for (const e of events) {
-          if (this.opts.store.isSeen(e.fingerprint) || seenInDryRun.has(e.fingerprint)) report.alreadySeen++;
+          if (this.opts.store.isTooOld(e.eventTs)) report.tooOld++;
+          else if (this.opts.store.isSeen(e.fingerprint) || seenInDryRun.has(e.fingerprint)) report.alreadySeen++;
           else {
             seenInDryRun.add(e.fingerprint);
             report.enqueued++;
@@ -130,6 +134,7 @@ export class Importer {
           const r = this.opts.store.commitBatch(events, null);
           report.enqueued += r.enqueued;
           report.alreadySeen += r.duplicates;
+          report.tooOld += r.tooOld;
           return;
         } catch (err) {
           if (!(err instanceof QueueFullError)) throw err;
@@ -162,7 +167,7 @@ export class Importer {
   async importFiles(files: readonly string[]): Promise<{ files: FileReport[]; total: Omit<FileReport, "file"> }> {
     const reports: FileReport[] = [];
     for (const f of files) reports.push(await this.importFile(f));
-    const total = { lines: 0, malformed: 0, oversized: 0, qualifying: 0, outOfRange: 0, enqueued: 0, alreadySeen: 0 };
+    const total = { lines: 0, malformed: 0, oversized: 0, qualifying: 0, outOfRange: 0, enqueued: 0, alreadySeen: 0, tooOld: 0 };
     for (const r of reports) {
       for (const k of Object.keys(total) as (keyof typeof total)[]) total[k] += r[k];
     }

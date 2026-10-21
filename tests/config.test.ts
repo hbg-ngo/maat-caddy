@@ -83,6 +83,15 @@ describe("config", () => {
     assert.throws(() => parseConfig(base({ debug: { log_level: "debug" } })), /unknown key/);
   });
 
+  it("keeps fingerprints forever unless seen_retention_days is set", () => {
+    assert.equal(parseConfig(base()).storage.seenRetentionDays, 0);
+    const example = loadConfig(new URL("../config/config.example.toml", import.meta.url).pathname);
+    assert.equal(example.storage.seenRetentionDays, 0);
+    assert.equal(parseConfig(base({ storage: { seen_retention_days: 400 } })).storage.seenRetentionDays, 400);
+    assert.throws(() => parseConfig(base({ storage: { seen_retention_days: 0.5 } })), /seen_retention_days must be an integer/);
+    assert.throws(() => parseConfig(base({ storage: { seen_retention_days: -1 } })), /seen_retention_days/);
+  });
+
   it("only allows the health endpoint on loopback IPs", () => {
     assert.throws(() => parseConfig(base({ server: { health_listen: "0.0.0.0:9788" } })), /loopback/);
     assert.throws(() => parseConfig(base({ server: { health_listen: "localhost:9788" } })), /loopback/);

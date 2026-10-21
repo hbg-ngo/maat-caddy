@@ -38,7 +38,18 @@ export interface CommitResult {
   enqueued: number;
   /** Events skipped because their fingerprint was already seen. */
   duplicates: number;
+  /** Events skipped because they are older than the fingerprint retention horizon. */
+  tooOld: number;
 }
+
+export type CleanupResult = {
+  delivered: number;
+  dead: number;
+  /** Fingerprints removed by `seenRetentionMs`. */
+  seen: number;
+};
+
+const SEEN_PRUNE_BATCH = 10_000;
 
 export class QueueFullError extends Error {
   override name = "QueueFullError";
@@ -87,8 +98,9 @@ CREATE TABLE IF NOT EXISTS events (
   last_error TEXT,
   finished_at INTEGER
 );
--- Fingerprints of every event ever enqueued. Never removed by retention, so a
--- request can never be enqueued twice (re-imports, checkpoint resets, overlap).
+-- Fingerprints of every event ever enqueued, so a request can never be enqueued
+-- twice (re-imports, checkpoint resets, overlap). Kept forever unless
+-- seenRetentionMs is set; older events are then refused instead.
 CREATE TABLE IF NOT EXISTS seen_events (
   fingerprint BLOB PRIMARY KEY,
   event_ts REAL NOT NULL
@@ -100,12 +112,18 @@ CREATE INDEX IF NOT EXISTS events_finished ON events (state, finished_at);
 
 export interface StoreOptions {
   maxQueueEvents: number;
+  /**
+   * Keep fingerprints only for events newer than this (0 = forever). Events
+   * older than the horizon can no longer be deduplicated and are refused.
+   */
+  seenRetentionMs?: number;
   now?: () => number;
 }
 
 export class Store {
   readonly db: Database.Database;
   private readonly maxQueueEvents: number;
+  private readonly seenRetentionMs: number;
   private readonly now: () => number;
   private readonly stmts;
   private readonly commitTx: Database.Transaction<
@@ -121,7 +139,10 @@ export class Store {
     this.db.exec(SCHEMA);
     this.migrate();
     this.maxQueueEvents = opts.maxQueueEvents;
+    this.seenRetentionMs = opts.seenRetentionMs ?? 0;
     this.now = opts.now ?? Date.now;
+    // Only needed for pruning; it would roughly double the table size otherwise.
+    if (this.seenRetentionMs > 0) this.db.exec("CREATE INDEX IF NOT EXISTS seen_events_ts ON seen_events (event_ts)");
 
     this.stmts = {
       getCheckpoint: this.db.prepare<
@@ -172,6 +193,10 @@ export class Store {
          WHERE id = @id AND state = 'inflight' AND lease_token = @token`,
       ),
       cleanup: this.db.prepare("DELETE FROM events WHERE state = @state AND finished_at < @before"),
+      pruneSeen: this.db.prepare(
+        `DELETE FROM seen_events WHERE fingerprint IN (
+           SELECT fingerprint FROM seen_events WHERE event_ts < @before LIMIT ${SEEN_PRUNE_BATCH})`,
+      ),
       stats: this.db.prepare<[], { state: string; n: number }>("SELECT state, COUNT(*) AS n FROM events GROUP BY state"),
       oldestPending: this.db
         .prepare<[], number | null>("SELECT MIN(created_at) FROM events WHERE state IN ('pending', 'inflight')")
@@ -188,10 +213,15 @@ export class Store {
 
     this.commitTx = this.db.transaction((events: readonly TrackEvent[], cp: FileCheckpoint | null) => {
       const now = this.now();
-      const result: CommitResult = { enqueued: 0, duplicates: 0 };
+      const result: CommitResult = { enqueued: 0, duplicates: 0, tooOld: 0 };
       if (events.length > 0) {
         const active = this.stmts.activeCount.get() ?? 0;
+        const horizon = this.seenHorizon(now);
         for (const e of events) {
+          if (e.eventTs < horizon) {
+            result.tooOld++;
+            continue;
+          }
           const fp = Buffer.from(e.fingerprint, "hex");
           if (this.stmts.markSeen.run({ fp, eventTs: e.eventTs }).changes === 0) {
             result.duplicates++;
@@ -245,9 +275,19 @@ export class Store {
     return this.commitTx.immediate(events, cp);
   }
 
-  /** True if an event with this fingerprint was ever enqueued. */
+  /** True if an event with this fingerprint was ever enqueued (within the retention horizon). */
   isSeen(fingerprint: string): boolean {
     return this.stmts.isSeen.get(Buffer.from(fingerprint, "hex")) === 1;
+  }
+
+  /** True if an event with this timestamp (Unix seconds) is beyond the fingerprint retention and would be refused. */
+  isTooOld(eventTs: number): boolean {
+    return eventTs < this.seenHorizon(this.now());
+  }
+
+  /** Oldest accepted event timestamp in Unix seconds (-Infinity when fingerprints are kept forever). */
+  private seenHorizon(now: number): number {
+    return this.seenRetentionMs > 0 ? (now - this.seenRetentionMs) / 1000 : -Infinity;
   }
 
   seenCount(): number {
@@ -300,11 +340,21 @@ export class Store {
     return this.stmts.dead.run({ id, token, reason, now: this.now() }).changes === 1;
   }
 
-  cleanup(deliveredRetentionMs: number, deadRetentionMs: number): { delivered: number; dead: number } {
+  cleanup(deliveredRetentionMs: number, deadRetentionMs: number): CleanupResult {
     const now = this.now();
     const delivered = this.stmts.cleanup.run({ state: "delivered", before: now - deliveredRetentionMs }).changes;
     const dead = this.stmts.cleanup.run({ state: "dead", before: now - deadRetentionMs }).changes;
-    return { delivered, dead };
+    let seen = 0;
+    if (this.seenRetentionMs > 0) {
+      // Small batches, each its own transaction, so a large first prune doesn't block the follower.
+      const before = this.seenHorizon(now);
+      let n: number;
+      do {
+        n = this.stmts.pruneSeen.run({ before }).changes;
+        seen += n;
+      } while (n === SEEN_PRUNE_BATCH);
+    }
+    return { delivered, dead, seen };
   }
 
   stats(): QueueStats {

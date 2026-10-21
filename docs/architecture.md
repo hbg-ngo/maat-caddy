@@ -19,7 +19,7 @@ lines, at most `batch_lines` per transaction. For each batch,
 (device, inode, offset and a SHA-256 fingerprint of the file's first ≤256
 bytes) in **one** `BEGIN IMMEDIATE` transaction (WAL, `synchronous=FULL`).
 
-- An event is only inserted if its fingerprint is new to the `seen_events` table, checked in the same transaction. Fingerprints are never deleted, so a request can't be queued twice. That holds even after a checkpoint reset or when the historic `import` overlaps the live log (see [import.md](import.md)). Skipped events are counted as `events_duplicate_skipped`.
+- An event is only inserted if its fingerprint is new to the `seen_events` table, checked in the same transaction. Fingerprints are never deleted (unless `seen_retention_days` is set, which also refuses older requests), so a request can't be queued twice. That holds even after a checkpoint reset or when the historic `import` overlaps the live log (see [import.md](import.md)). Skipped events are counted as `events_duplicate_skipped`.
 - If the commit fails (I/O error, or the queue holds `max_queue_events`), nothing is committed. The follower re-reads the same lines on its next poll.
 - Partial lines are never consumed. They are re-read until their newline arrives.
 - A line longer than `max_line_bytes` is skipped in memory. The checkpoint never points into the middle of a line.
@@ -59,7 +59,7 @@ Every failed delivery falls into one of three classes:
 
 - **Backoff:** `min(max_backoff, initial·2^(attempt-1))`, of which half is fixed and half is random jitter.
 - **Exhausted:** after `max_attempts` the event is dead-lettered as `exhausted_<reason>`. Events whose lease expired too often are dead-lettered as `lease_expired_exhausted`.
-- **Retention:** delivered and dead events are deleted after `delivered_retention_days` and `dead_letter_retention_days`. Pending events are never deleted.
+- **Retention:** delivered and dead events are deleted after `delivered_retention_days` and `dead_letter_retention_days`. Pending events are never deleted. Fingerprints are kept forever unless `seen_retention_days` is set (see [import.md](import.md#disk-usage)).
 
 ### Duplicates and `on_ambiguous_failure`
 
