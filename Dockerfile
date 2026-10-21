@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
 # Node.js 24 LTS, pinned by multi-arch index digest. Build on Debian trixie slim,
 # run on distroless (no shell, no package manager) with the same Node version.
 # Must match .nvmrc and package.json "engines": Renovate updates them together
