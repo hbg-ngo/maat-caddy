@@ -47,5 +47,11 @@
       matchUpdateTypes: ["major"],
       dependencyDashboardApproval: true,
     },
+    {
+      description: "TypeScript majors must wait for typescript-eslint peer support (TS 7: peer is <6.1.0); approve from the dashboard",
+      matchDepNames: ["typescript"],
+      matchUpdateTypes: ["major"],
+      dependencyDashboardApproval: true,
+    },
   ],
 }
