@@ -3,8 +3,8 @@
 # run on distroless (no shell, no package manager) with the same Node version.
 # Must match .nvmrc and package.json "engines": Renovate updates them together
 # and CI fails if the runtime image ships a different Node version.
-ARG NODE_IMAGE=node:24.22.0-trixie-slim@sha256:7f486cabe892bff8fef04c0f7da8dba84a560be3e4e2740b7a86afc57ebec315
-ARG RUNTIME_IMAGE=gcr.io/distroless/nodejs24-debian13:latest@sha256:9ddd3f7de61d8c62337cdcbeaceb621de5e0c955ccdc70f4c3586db74a8c278f
+ARG NODE_IMAGE=node:24.22.2-trixie-slim@sha256:54f84b4cf8432b21aaffd5d3ce8d41e12cea0d10d33c09d2f3c9879d49d6b446
+ARG RUNTIME_IMAGE=gcr.io/distroless/nodejs24-debian13:latest@sha256:51eee69b25037942014428da85f5b436a4d88f283e545981d03f25b7db72469a
 
 FROM ${NODE_IMAGE} AS build
 WORKDIR /app
