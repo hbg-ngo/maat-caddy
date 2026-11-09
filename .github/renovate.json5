@@ -25,6 +25,11 @@
       automerge: true,
     },
     {
+      description: "These updates carry no release timestamp, so with the default timestamp-required renovate/stability-days stays pending forever and automerge never fires (renovatebot/renovate#45236). Lock file maintenance still honours minimumReleaseAge via npm --before.",
+      matchUpdateTypes: ["lockFileMaintenance", "digest", "pinDigest", "pin"],
+      minimumReleaseAgeBehaviour: "timestamp-optional",
+    },
+    {
       description: "One PR for dev tooling",
       matchDepTypes: ["devDependencies"],
       matchUpdateTypes: ["minor", "patch"],
