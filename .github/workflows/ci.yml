@@ -43,6 +43,7 @@ jobs:
           output-format: table
           severity-cutoff: high
           only-fixed: true
+          cache-db: true
 
   dependency-review:
     if: github.event_name == 'pull_request'

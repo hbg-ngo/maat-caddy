@@ -42,6 +42,13 @@
       groupName: "Node.js",
     },
     {
+      description: "Distroless rebuilds carry Debian security fixes but publish no release timestamp, so minimumReleaseAge would hold them forever. CI blocks on fixable CVEs in this image.",
+      matchDepNames: ["/^gcr\\.io/distroless//"],
+      matchUpdateTypes: ["digest"],
+      minimumReleaseAge: null,
+      schedule: ["at any time"],
+    },
+    {
       description: "Node.js majors need a manual switch (distroless image name, @types/node); approve from the dashboard",
       matchDepNames: ["node", "@types/node"],
       matchUpdateTypes: ["major"],
