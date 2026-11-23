@@ -4,7 +4,7 @@
 # Must match .nvmrc and package.json "engines": Renovate updates them together
 # and CI fails if the runtime image ships a different Node version.
 ARG NODE_IMAGE=node:24.22.3-trixie-slim@sha256:af02d57b57719b9657a45199a79264a9437940cd55b3c7b3fc99615654f124a0
-ARG RUNTIME_IMAGE=gcr.io/distroless/nodejs24-debian13:latest@sha256:24bc0fe0225c7518f202a822587dad74fe143b96326b81fe5cc08c1df8bed03e
+ARG RUNTIME_IMAGE=gcr.io/distroless/nodejs24-debian13:latest@sha256:ba59ac9916b424cdfaaa8299695530251535843623a6d8f93d40b0a2ef69e390
 
 FROM ${NODE_IMAGE} AS build
 WORKDIR /app
